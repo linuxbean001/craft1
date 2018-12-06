@@ -1,0 +1,10 @@
+.DS_Store
+.idea
+*.log
+*.bak
+*.orig
+*.sass-cache/*
+*Thumbs.db
+*aspnet_client/*
+/composer.lock
+/node_modules

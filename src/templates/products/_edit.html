@@ -1,0 +1,250 @@
+{# @var product \craft\commerce\elements\Product #}
+
+{% extends "commerce/_layouts/cp" %}
+
+{% set selectedSubnavItem = "products" %}
+{% set bodyClass = (bodyClass is defined ? bodyClass~' ' : '') ~ "commerceproducts commerceproductsedit" %}
+
+{% set crumbs = [
+    { label: "Products"|t('commerce'), url: url('commerce/products') },
+    { label: productType.name|t('commerce'), url: url('commerce/products/'~productType.handle) }
+] %}
+
+{% set fullPageForm = true %}
+{% set saveShortcutRedirect = continueEditingUrl %}
+
+{% import "_includes/forms" as forms %}
+{% import "commerce/products/_fields" as productFields %}
+
+
+{% block header %}
+    {{ block('pageTitle') }}
+    {{ block('contextMenu') }}
+    <div class="flex-grow"></div>
+    {% if showPreviewBtn or shareUrl is defined %}
+        {% if showPreviewBtn %}
+            <div class="btn livepreviewbtn">{{ "Live Preview"|t('app') }}</div>
+        {% endif %}
+        {% if shareUrl is defined %}
+            <a href="{{ shareUrl }}" class="btn sharebtn"
+               target="_blank">{{ 'Share'|t('app') }}</a>
+        {% endif %}
+        <div class="flex-grow"></div>
+    {% endif %}
+    {{ block('actionButton') }}
+{% endblock %}
+
+
+{% block contextMenu %}
+    {% if craft.app.getIsMultiSite() %}
+        <div class="btn menubtn sitemenubtn"
+             data-icon="world">{{ product.site.name|t('site') }}</div>
+        <div class="menu">
+            <ul class="padded">
+                {% for siteId in siteIds %}
+                    {% set site = craft.app.sites.getSiteById(siteId) %}
+                    {% set status = siteId in enabledSiteIds ? 'enabled' : 'disabled' %}
+                    <li>
+                        {% if siteId == product.siteId %}
+                            <a class="sel" data-site-id="{{ siteId }}">
+                                <div class="status {{ status }}"></div>{{ site.name|t('site') }}
+                            </a>
+                        {% else %}
+                            {% set url = url("commerce/products/#{productTypeHandle}/#{craft.app.request.getSegment(4)}/#{site.handle}") %}
+                            <a href="{{ url }}" data-site-id="{{ siteId }}">
+                                <div class="status {{ status }}"></div>{{ site.name|t('site') }}
+                            </a>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+{% endblock %}
+
+
+{% block actionButton %}
+    <div class="btngroup">
+        <input type="submit" class="btn submit"
+               value="{{ 'Save'|t('commerce') }}">
+        <div class="btn submit menubtn"></div>
+        <div class="menu">
+            <ul>
+                <li>
+                    <a class="formsubmit"
+                       data-redirect="{{ continueEditingUrl|hash }}">
+                        {{ "Save and continue editing"|t('commerce') }}
+                        {{ forms.optionShortcutLabel('S') }}
+                    </a>
+                </li>
+                {% if product.id %}
+                    <li>
+                        <a class="formsubmit" data-param="productId"
+                           data-value=""
+                           data-redirect="{{ continueEditingUrl|hash }}">
+                            {{ "Save as a new product"|t('commerce') }}
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+            {% if product.id %}
+                <hr>
+                <ul>
+                    <li>
+                        <a class="formsubmit error"
+                           data-action="commerce/products/delete-product"
+                           data-confirm="{{ 'Are you sure you want to delete this product?'|t('commerce') }}"
+                           data-redirect="{{ 'commerce/products'|hash }}">
+                            {{ 'Delete'|t('commerce') }}
+                        </a>
+                    </li>
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <input type="hidden" name="action" value="commerce/products/save-product">
+    <input type="hidden" name="typeId" value="{{ productType.id }}">
+    {% if product.id %}<input type="hidden" name="productId"
+                              value="{{ product.id }}">{% endif %}
+    {% if craft.app.getIsMultiSite() %}
+        <input type="hidden" name="siteId" value="{{ product.siteId }}">
+    {% endif %}
+    {{ redirectInput('commerce/products') }}
+    {{ csrfInput() }}
+
+    <div id="fields">
+        {{ productFields.titleField(product) }}
+
+        <div>
+            {% set tabs = productType.getProductFieldLayout().getTabs() %}
+            {% for tab in tabs %}
+                <div id="tab{{ loop.index }}" {% if not loop.first %} class="hidden" {% endif %}>
+                    {% include "_includes/fields" with {
+                        fields: tab.getFields(),
+                        element: product,
+                    } only %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if productType.hasVariants %}
+        <div id="variants-container" {% if productType.getProductFieldLayout().getTabs()|length >= 1 %}class="hidden"{% endif %}>
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Variants'|t('commerce') }}</label>
+                </div>
+                <div class="input">
+
+                    {% if product.hasErrors('variants') %}
+                    {% for error in product.getErrors('variants') %}
+                        <div class="error">{{ error }}</div>
+                    {% endfor %}
+                    {% endif %}
+
+                    {{ variantMatrixHtml|raw }}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+
+{% block details %}
+<div class="meta">
+    {{ productFields.generalMetaFields(product) }}
+
+    {{ forms.lightswitchField({
+        label: "Enabled"|t('commerce'),
+        id: 'enabled',
+        name: 'enabled',
+        on: product.enabled
+    }) }}
+
+    {% if craft.app.getIsMultiSite() %}
+        {{ forms.lightswitchField({
+            label: "Enabled for site"|t('commerce'),
+            id: 'enabledForSite',
+            name: 'enabledForSite',
+            on: product.enabledForSite
+        }) }}
+    {% endif %}
+</div>
+
+<hr>
+
+<div class="meta">
+    {{ productFields.behavioralMetaFields(product) }}
+</div>
+
+{% if not productType.hasVariants %}
+    <hr>
+    {% namespace 'variants['~(product.defaultVariant.id ?: 'new1')~']' %}
+        <div class="meta">
+            {{ productFields.generalVariantFields(product.defaultVariant) }}
+        </div>
+        {% if productType.hasDimensions %}
+            <hr>
+            <div class="meta">
+                {{ productFields.dimensionVariantFields(product.defaultVariant) }}
+            </div>
+        {% endif %}
+    {% endnamespace %}
+{% endif %}
+
+    {% if product.id %}
+<hr>
+<div class="meta read-only">
+    <div class="data">
+        <h5 class="heading">{{ "Related Sales"|t('commerce') }}</h5>
+        <div class="value">
+            {% if not sales|length %}
+                <a class="btn small add icon"
+                   href="{{ cpUrl('commerce/promotions/sales/new?purchasableIds='~product.id) }}">Add
+                    Sale</a>
+            {% else %}
+                <ul class="commerce-sales">
+                    {% for sale in sales %}
+                        <li>
+                            <a href="{{ sale.getCpEditUrl() }}"><span>{{ sale.name }}</span></a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+    {% if sales|length %}
+        <div class="data">
+            <h5 class="heading"></h5>
+            <div class="value">
+                <a class="btn small add icon"
+                   href="{{ cpUrl('commerce/promotions/sales/new?purchasableIds='~product.id) }}">Add
+                    Sale</a>
+            </div>
+        </div>
+    {% endif %}
+    <div class="data">
+        <h5 class="heading">{{ "Date Created"|t('commerce') }}</h5>
+        <div class="value">{{ product.dateCreated|date('short') }} {{ product.dateCreated|time('short') }}</div>
+    </div>
+    <div class="data">
+        <h5 class="heading">{{ "Date Updated"|t('commerce') }}</h5>
+        <div class="value">{{ product.dateUpdated|date('short') }} {{ product.dateUpdated|time('short') }}</div>
+    </div>
+
+    {% endif %}
+
+    {% hook "cp.commerce.product.edit.details" %}
+</div>
+{% endblock %}
+
+
+    {% if not product.slug %}
+        {% js %}
+            window.slugGenerator = new Craft.SlugGenerator('#title', '#slug');
+        {% endjs %}
+    {% endif %}

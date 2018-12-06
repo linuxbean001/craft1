@@ -1,0 +1,90 @@
+{% extends "_layouts/cp" %}
+{% import "_includes/forms" as forms %}
+
+{% set selectedSubnavItem = "orders" %}
+{% set bodyClass = (bodyClass is defined ? bodyClass~' ' : '') ~ "commerceorders commerceordersedit" %}
+
+{% set crumbs = [
+    {    label: "Orders"|t('commerce'), url: url('commerce/orders') }
+] %}
+
+{% set pdfUrl = order.getPdfUrl() %}
+
+{% hook "cp.commerce.order.edit" %}
+
+{% block actionButton %}
+    {% if pdfUrl %}
+        <a class="btn" href="{{ order.pdfUrl }}" target="_blank">{{ 'Download PDF'|t('commerce') }}</a>
+        <div class="flex-grow"></div>
+    {% endif %}
+
+    <input type="hidden" name="action" value="commerce/orders/save-order">
+    <input type="hidden" name="orderId" value="{{ order.id }}">
+    {{ redirectInput('commerce/orders') }}
+
+    <div class="btngroup">
+        <input type="submit" class="btn submit" value="{{ 'Save'|t('app') }}">
+
+        <div class="btn submit menubtn"></div>
+        <div class="menu">
+            <ul>
+                <li><a class="formsubmit"
+                       data-redirect="{{ continueEditingUrl|hash }}">
+                        {{ forms.optionShortcutLabel('S') }}
+                        {{ "Save and continue editing"|t('app') }}
+                    </a></li>
+            </ul>
+
+            <hr>
+            <ul>
+                <li><a class="formsubmit error"
+                       data-action="commerce/orders/delete-order"
+                       data-confirm="{{ 'Are you sure you want to delete this order?'|t('app') }}"
+                       data-redirect="{{ 'commerce/orders#'|hash }}">{{ 'Delete'|t('app') }}</a>
+                </li>
+            </ul>
+
+        </div>
+    </div>
+{% endblock %}
+
+{% block details %}
+
+    <div class="meta">
+    {% include 'commerce/orders/_orderInfo' %}
+    {% include 'commerce/orders/_addresses' %}
+    </div>
+
+{% endblock %}
+
+{% block content %}
+
+    {% include 'commerce/orders/_orderDetails' %}
+    {% include 'commerce/orders/_customFields' %}
+    {% include 'commerce/orders/_transactions' %}
+    {% include 'commerce/orders/_history' %}
+
+{% endblock %}
+
+{% js %}
+    window.countries = {{ craft.commerce.countries.allCountries|values|json_encode|raw }};
+    window.states = {{ craft.commerce.states.allStates|values|json_encode|raw }};
+
+    $(document).ready(function () {
+    {% if paymentForm is defined and paymentForm %}
+        new Craft.Commerce.OrderEdit({
+            orderId: {{ orderId|e('js') }},
+            paymentForm: {
+                errors: {{ paymentForm.errors|json_encode|raw }},
+                attributes: {{ paymentForm.attributes|json_encode|raw }}
+            }
+        });
+    {% endif %}
+
+        $.each($('.tableRowInfo'), function () {
+            new Craft.Commerce.TableRowAdditionalInfoIcon(this);
+        });
+    });
+{% endjs %}
+
+{% do view.registerAssetBundle("craft\\web\\assets\\prismjs\\PrismJsAsset") %}
